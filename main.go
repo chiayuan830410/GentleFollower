@@ -7,37 +7,52 @@ import (
 	"os"
 	"strings"
 	"time"
+	"math/rand"
 	"gopkg.in/ahmdrz/goinsta.v2"
 )
 
-func saveIG(insta* goinsta.Instagram) {
-
-    // open output file
-    fo, err := os.Create("list.txt")
-    if err != nil {
-        panic(err)
-    }
-    // close fo on exit and check for its returned error
-    defer func() {
-        if err := fo.Close(); err != nil {
-            panic(err)
-        }
-    }()
-
+func getFollowList(insta* goinsta.Instagram)[]string {
 	users := insta.Account.Following()
-
-	for users.Next() {
-		fmt.Println("Next:", users.NextID)
-		for _, user := range users.Users {
-			fmt.Printf("   - %s\n", user.Username)
-			if _, err := fo.Write([]byte(user.Username + "\n")); err != nil {
-				panic(err)
-			}
+	if users.Next() {
+		follingList := make([]string,len(users.Users))
+		for i, user := range users.Users {
+			follingList[i] = user.Username
 		}
+		return follingList
+	} else {
+		return []string{}
 	}
 }
-func followIG(insta* goinsta.Instagram) {
+
+func saveIG(insta* goinsta.Instagram) {
+
+	// open output file
+	file, err := os.Create("list.txt")
+	if err != nil {
+		panic(err)
+	}
+	// close file on exit and check for its returned error
+	defer func() {
+		if err := file.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	foLists:=getFollowList(insta)
 	
+	for _, fo := range foLists {
+		if _, err := file.Write([]byte(fo + "\n")); err != nil {
+			panic(err)
+		}
+	}
+
+}
+func restoreIG(insta* goinsta.Instagram) {
+	//get following list
+	foLists:=getFollowList(insta)
+	oldFoLists:=make([]string,0)
+
+	//get history data
 	inputFile, err := os.Open("list.txt")
 	if err != nil {
 		fmt.Println("open error!")
@@ -47,29 +62,62 @@ func followIG(insta* goinsta.Instagram) {
 
 	inputReader := bufio.NewReader(inputFile)
 	
+	//get old following list
 	for {
-		
 		name, Error := inputReader.ReadString('\n')
-		
 		if Error == io.EOF {
-			
-			return
+			break
 		}
 		if len(strings.TrimSpace(name)) != 0 {
-			for {
-				user, err := insta.Profiles.ByName(strings.TrimSpace(name))
-				fmt.Println(name)
-				if err != nil {
-					fmt.Println(err)
-					time.Sleep(50*time.Second)
-				} else {
-					_ = user.Follow()
-					break
-				}
-			}			
+			oldFoLists=append(oldFoLists,strings.TrimSpace(name))
+		}
+	}
+
+	for i,fo := range foLists {
+		for j,oFo := range oldFoLists {
+			if fo==oFo {
+				foLists[i] = ""
+				oldFoLists[j] = ""
+				break
+			}
+		}
+	}
+
+	//unfollow 
+	fmt.Println("Unfollow :")
+	for _,fo := range foLists {	
+		if fo != "" {
+			user, err := insta.Profiles.ByName(fo)
+			if err != nil {
+				fmt.Println(err)
+				time.Sleep(50*time.Second)
+			} else {
+				fmt.Println(fo)
+				//avoid account be blocked
+				time.Sleep(time.Duration(rand.Intn(5000)+500)*time.Millisecond)
+				_ = user.Unfollow()
+			}
+		}
+	}
+
+	//follow 
+	fmt.Println("Follow :")
+	for _,oFo := range oldFoLists {	
+		if oFo != "" {
+			user, err := insta.Profiles.ByName(oFo)
+			if err != nil {
+				fmt.Println(err)
+				time.Sleep(50*time.Second)
+			} else {
+				//avoid account be blocked
+				time.Sleep(time.Duration(rand.Intn(5000)+500)*time.Millisecond)
+				fmt.Println(oFo)
+				_ = user.Follow()
+			}
 		}
 	}
 }
+
 func main() {
 	var yourAccount string
 	var yourPasswd string
@@ -85,15 +133,15 @@ func main() {
 		return
 	}
 	defer insta.Logout()
-	fmt.Println("1. Save follows\n2. Restore follows\nPlease enter a number : ")
+	fmt.Println("1. Save following\n2. Restore following\nPlease enter a number : ")
 	fmt.Scanln(&taskType)
 	switch taskType {
 	case 1:
-		fmt.Println("Save follows")
+		fmt.Println("Save following")
 		saveIG(insta)
 	case 2:
-		fmt.Println("Restore follows")
-		followIG(insta)
+		fmt.Println("Restore following")
+		restoreIG(insta)
 	default:
 		fmt.Println("Wrong input")
 	}
