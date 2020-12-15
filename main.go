@@ -70,19 +70,32 @@ func followIG(insta* goinsta.Instagram) {
 		}
 	}
 }
-func main() {  
-	insta := goinsta.New("yourAccount", "yourPasswd")
+func main() {
+	var yourAccount string
+	var yourPasswd string
+	var taskType int // 1. save; 2. restore;
+
+	fmt.Println("Please enter Account : ")
+	fmt.Scanln(&yourAccount)
+	fmt.Println("Please enter Password : ")
+	fmt.Scanln(&yourPasswd)
+	insta := goinsta.New(yourAccount, yourPasswd)
 	if err := insta.Login(); err != nil {
 		fmt.Println(err)
 		return
 	}
 	defer insta.Logout()
-	//saveIG(insta)
-	//followIG(insta)
+	fmt.Println("1. Save follows\n2. Restore follows\nPlease enter a number : ")
+	fmt.Scanln(&taskType)
+	switch taskType {
+	case 1:
+		fmt.Println("Save follows")
+		saveIG(insta)
+	case 2:
+		fmt.Println("Restore follows")
+		followIG(insta)
+	default:
+		fmt.Println("Wrong input")
+	}
 	
-	
-	
-  
-
-  
 }
